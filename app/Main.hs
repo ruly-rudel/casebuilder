@@ -3,7 +3,7 @@
 
 module Main (main) where
 
-import CaseBuilder ( Defs(..), Sel(..), buildCase )
+import CaseBuilder ( Def(..), Sel(..), buildCase )
 
 main :: IO ()
 main = putStrLn "No implementation"
