@@ -4,25 +4,24 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build and run",
+            "label": "test",
             "type": "shell",
             "command": "stack build && stack run",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+
+        },
+        {
+            "label": "build and run",
+            "type": "shell",
+            "command": "stack test",
             "group": {
                 "kind": "build",
                 "isDefault": false
             }
 
         },
-        {
-            "label": "build and test",
-            "type": "shell",
-            "command": "stack build && stack test",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-
-        }
-
     ]
 }

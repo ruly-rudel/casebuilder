@@ -1,6 +1,9 @@
+{-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main (main) where
 
-import Lib ( someFunc )
+import CaseBuilder ( Defs(..), Sel(..), buildCase )
 
 main :: IO ()
-main = someFunc
+main = putStrLn "No implementation"
