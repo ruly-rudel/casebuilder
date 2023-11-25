@@ -1,4 +1,4 @@
-# casemarger
+# casebuilder
 
 stdinから下記形式のcase定義を入力し、パースして巨大なcase文を1個作り、stdoutに下記形式で出力する。
 
