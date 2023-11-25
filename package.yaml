@@ -21,6 +21,11 @@ description:         Please see the README on GitHub at <https://github.com/ruly
 
 dependencies:
 - base >= 4.7 && < 5
+- attoparsec
+- text
+- exceptions
+- transformers
+- mtl
 
 ghc-options:
 - -Wall

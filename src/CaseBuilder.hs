@@ -1,4 +1,5 @@
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module CaseBuilder where
 
