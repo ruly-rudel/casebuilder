@@ -3,7 +3,7 @@
 
 import Test.HUnit
 import Control.Monad ( void )
-import CaseBuilder (Def(..), Sel(..), buildCase)
+import CaseBuilder (Def(..), Sel(..), Expr(..), buildCase, parseCDF)
 
 main :: IO ()
 main = do
@@ -86,7 +86,11 @@ main = do
                                [Sel 0b0000000 "[SRLIW]"
                                   [RTL "rd = s32to64(RS1[31:0] >> shamt[4:0]);"],
                                 Sel 0b0100000 "[SRAIW]"
-                                  [RTL "rd = s32to64($signed(RS1[31:0]) >>> shamt[4:0]);"]]]]]]]])
+                                  [RTL "rd = s32to64($signed(RS1[31:0]) >>> shamt[4:0]);"]]]]]]]]),
+      "00_03" ~: CaseSel 0 "op" (2, 0b11) "[32bit instruction]" [] ~=? (parseCDF "op 2'b11 [32bit instruction]"),
+      "00_04" ~: CaseSel 0 "op" (2, 0b11) "[32bit instruction]" 
+        [CaseSel 2 "opcode" (5, 0b00101) "[AUIPC]" [Code 4 "rd = PC + imm_u;"]] ~=? 
+          parseCDF "op 2'b11 [32bit instruction]\n  opcode 5'b00101 [AUIPC]\n    rd = PC + imm_u;\n"
     ]
 
 {-
