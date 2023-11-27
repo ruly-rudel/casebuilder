@@ -3,27 +3,28 @@
 
 module CaseBuilder ( Def(..), Sel(..), Expr(..), buildCase, parseCDF ) where
 
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as BS
+import           Data.ByteString.Builder
 
 data Sel = Sel  Int BS.ByteString [Def]
 data Def = Case BS.ByteString Int [Sel] |
            RTL  BS.ByteString
 
-indent :: Int -> BS.ByteString -> BS.ByteString
-indent n x = BS.replicate n ' ' `mappend` x
+indent :: Int -> Builder -> Builder
+indent n x = lazyByteString (BS.replicate (toEnum n) ' ') <> x
 
-buildCase :: Int -> Def -> [BS.ByteString]
+buildCase :: Int -> Def -> Builder
 buildCase n x = case x of
     Case switch bits sels ->
-        (indent n ("case(" `mappend` switch `mappend` ")\n") : concatMap (buildSel bits (n + 2)) sels)
-         ++ [indent (n + 2) "default: id_we = 1'b0;\n", indent n "endcase\n"]
-    RTL text -> [indent n (text `mappend` "\n")]
+        indent n $ "case(" <> lazyByteString switch <> ")\n" <> foldr1 (<>) (map (buildSel bits (n + 2)) sels)
+            <> indent (n + 2) "default: id_we = 1'b0;\n" <> indent n "endcase\n"
+    RTL text -> indent n (lazyByteString text <> "\n")
 
-buildSel :: Int -> Int -> Sel -> [BS.ByteString]
+buildSel :: Int -> Int -> Sel -> Builder
 buildSel bits n x = case x of
     Sel val comment defs ->
-        BS.concat [indent n $ BS.pack (show bits), "'d", BS.pack (show val), ": // ", comment, "\n"] : 
-            concatMap (buildCase (n + 2)) defs
+        indent n $ intDec bits <> "'d" <> intDec val <> ": // " <> lazyByteString comment <> "\n" <>
+        foldr1 (<>) (map (buildCase (n + 2)) defs)
 
 data Expr = CaseSel Int BS.ByteString (Int, Int) BS.ByteString [Expr] |
             Code Int BS.ByteString
