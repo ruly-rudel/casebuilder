@@ -26,6 +26,7 @@ dependencies:
 - exceptions
 - transformers
 - mtl
+- bytestring
 
 ghc-options:
 - -Wall
