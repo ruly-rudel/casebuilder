@@ -1,7 +1,7 @@
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module CaseBuilder ( Def(..), Sel(..), Expr(..), buildCase, parseCDF ) where
+module CaseBuilder ( Def(..), Sel(..),buildCase ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import           Data.ByteString.Builder
@@ -25,12 +25,4 @@ buildSel bits n x = case x of
     Sel val comment defs ->
         indent n $ intDec bits <> "'d" <> intDec val <> ": // " <> lazyByteString comment <> "\n" <>
         foldr1 (<>) (map (buildCase (n + 2)) defs)
-
-data Expr = CaseSel Int BS.ByteString (Int, Int) BS.ByteString [Expr] |
-            Code Int BS.ByteString
-            deriving (Show, Eq)
-
-parseCDF :: String -> Expr
-parseCDF x =
-    CaseSel 0 "op" (2, 0b11) "[32bit instruction]" []
 

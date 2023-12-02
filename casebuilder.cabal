@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       CaseBuilder
+      Parsing
   other-modules:
       Paths_casebuilder
   hs-source-dirs:
