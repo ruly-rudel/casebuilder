@@ -7,7 +7,7 @@ module Parsing
         none, lowers, space, symbol, token, some, many, optional,
         natural, int, indent, ident, parseCase, parseCode, parseLine, parseExpr
     ) where
-import Data.Char (isLower, isDigit, isSpace, isAlpha, isAlphaNum, isNumber)
+import Data.Char (isLower, isDigit, isSpace, isAlpha, isAlphaNum)
 
 
 newtype Parser a = Parser (String -> [(a, String)])
@@ -55,6 +55,10 @@ lower = sat isLower
 
 digit :: Parser Int
 digit = do {d <- sat isDigit; return (cvt d)} where
+    cvt d = fromEnum d - fromEnum '0'
+
+bit :: Parser Int
+bit = do {d <- sat (\c -> c == '0' || c == '1'); return (cvt d)} where
     cvt d = fromEnum d - fromEnum '0'
 
 (<|>) :: Parser a -> Parser a -> Parser a
@@ -108,10 +112,8 @@ ident = do { a <- sat isAlpha; as <- many (sat isAlphaNum); return $ a:as}
 
 
 bits :: Parser Int
-bits = do {ds <- some digit; return (foldl1 shiftl ds)}
+bits = do {ds <- some bit; return (foldl1 shiftl ds)}
         where shiftl m n = 2 * m + n
---bits :: Parser [Char]
---bits = many (sat isNumber)
 
 tillCrlf :: Parser [Char]
 tillCrlf = many (sat (/= '\n'))
@@ -127,10 +129,10 @@ data Expr = CaseSel Int String (Int, Int) String |
 parseCase :: Parser Expr
 parseCase = do
     sp <- indent
-    name <- ident 
-    w <- natural 
-    string "'b" 
-    num <- bits 
+    name <- ident
+    w <- natural
+    string "'b"
+    num <- bits
     space
     com <- tillCrlf
     _ <- crlf

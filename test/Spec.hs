@@ -4,7 +4,7 @@
 import Test.HUnit
 import Control.Monad ( void )
 import CaseBuilder (Def(..), Sel(..), buildCase)
-import Parsing (Parser(..), Expr(..), apply1, parseExpr)
+import Parsing (Expr(..), apply1, parseExpr)
 import Data.ByteString.Builder (toLazyByteString)
 
 main :: IO ()
