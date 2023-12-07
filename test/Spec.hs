@@ -3,8 +3,8 @@
 
 import Test.HUnit
 import Control.Monad ( void )
-import CaseBuilder (Def(..), Sel(..), buildCase)
-import Parsing (Expr(..), apply1, parseExpr)
+import CaseBuilder (Def(..), Sel(..), buildCase, convert, switchState)
+import Parsing (Expr(..), parse, parseExpr)
 import Data.ByteString.Builder (toLazyByteString)
 
 main :: IO ()
@@ -12,6 +12,7 @@ main = do
   void $ runTestTT $ TestList
     [
       "00_00" ~: "rd = imm_u;\n" ~=? toLazyByteString (buildCase 0 (RTL "rd = imm_u;")),
+
       "00_01" ~:
         "case(op)\n" <>
         "  2'd3: // [32bit instruction]\n" <>
@@ -20,6 +21,7 @@ main = do
         "endcase\n"
          ~=?
         toLazyByteString (buildCase 0 (Case "op" 2 [Sel 0b11 "[32bit instruction]" [RTL "rd = imm_u;"]])),
+
       "00_02" ~:
         "case(op)\n" <>
         "  2'd3: // [32bit instruction]\n" <>
@@ -89,11 +91,26 @@ main = do
                                   [RTL "rd = s32to64(RS1[31:0] >> shamt[4:0]);"],
                                 Sel 0b0100000 "[SRAIW]"
                                   [RTL "rd = s32to64($signed(RS1[31:0]) >>> shamt[4:0]);"]]]]]]]])),
-      "00_03" ~: [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] ~=? apply1 parseExpr "op 2'b11 [32bit instruction]\n",
+
+      "00_03" ~: [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] ~=? parse parseExpr "op 2'b11 [32bit instruction]\n",
+
       "00_04" ~: [CaseSel 0 "op" (2, 0b11) "[32bit instruction]",
                   CaseSel 2 "opcode" (5, 0b00101) "[AUIPC]",
                   Code 4 "rd = PC + imm_u;"] ~=?
-          apply1 parseExpr "op 2'b11 [32bit instruction]\n  opcode 5'b00101 [AUIPC]\n    rd = PC + imm_u;\n"
+          parse parseExpr "op 2'b11 [32bit instruction]\n  opcode 5'b00101 [AUIPC]\n    rd = PC + imm_u;\n",
+
+      "00_05" ~: (Case "op" 2 [Sel 0b11 "[32bit instruction]" []]) ~=?
+          convert [] (Case "root" 0 []) [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"],
+
+      "00_06" ~: (Case "op" 2 [Sel 0b11 "[32bit instruction]" [RTL "rd = imm_u;"]]) ~=?
+          convert [] (Case "root" 0 []) [CaseSel 0 "op" (2, 0b11) "[32bit instruction]",
+                   Code 4 "rd = imm_u;"],
+
+      "00_07" ~: [CaseSel 4 "opcode" (5,13) "[LUI]",CaseSel 0 "op" (2,3) "[32bit instruction]"] ~=?
+                   let ss1 = switchState [] (CaseSel 0 "op" (2, 0b11) "[32bit instruction]")
+                       ss2 = switchState ss1 (CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]") 
+                       ss3 = switchState ss2 (CaseSel 4 "opcode" (5, 0b01101 ) "[LUI]") in ss3
+
     ]
 
 {-

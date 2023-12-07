@@ -2,7 +2,7 @@ module Parsing
     (
         Parser(..),
         Expr(..),
-        apply, apply1,
+        apply, parse,
         getc, sat, fails, char, string, lower, digit, (<|>),
         none, lowers, space, symbol, token, some, many, optional,
         natural, int, indent, ident, parseCase, parseCode, parseLine, parseExpr
@@ -15,9 +15,8 @@ newtype Parser a = Parser (String -> [(a, String)])
 apply :: Parser a -> String -> [(a, String)]
 apply (Parser p) = p
 
-apply1 :: Parser a -> String -> a
-apply1 p s =
-    let (a, _) = head (apply p s) in a
+parse :: Parser a -> String -> a
+parse p = fst. head . apply p
 
 instance Functor Parser where
     fmap = undefined

@@ -36,7 +36,9 @@ library
       attoparsec
     , base >=4.7 && <5
     , bytestring
+    , containers
     , exceptions
+    , lens
     , mtl
     , text
     , transformers
@@ -54,7 +56,9 @@ executable casebuilder-exe
     , base >=4.7 && <5
     , bytestring
     , casebuilder
+    , containers
     , exceptions
+    , lens
     , mtl
     , text
     , transformers
@@ -74,7 +78,9 @@ test-suite casebuilder-test
     , base >=4.7 && <5
     , bytestring
     , casebuilder
+    , containers
     , exceptions
+    , lens
     , mtl
     , text
     , transformers

@@ -27,6 +27,8 @@ dependencies:
 - transformers
 - mtl
 - bytestring
+- containers
+- lens
 
 ghc-options:
 - -Wall
