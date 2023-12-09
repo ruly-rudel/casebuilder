@@ -3,7 +3,7 @@
 
 import Test.HUnit
 import Control.Monad ( void )
-import CaseBuilder (Def(..), Sel(..), buildCase, convert, switchState)
+import CaseBuilder (Def(..), Sel(..), buildCase, convert, switchState, deepCopy, ensure )
 import Parsing (Expr(..), parse, parseExpr)
 import Data.ByteString.Builder (toLazyByteString)
 
@@ -99,18 +99,104 @@ main = do
                   Code 4 "rd = PC + imm_u;"] ~=?
           parse parseExpr "op 2'b11 [32bit instruction]\n  opcode 5'b00101 [AUIPC]\n    rd = PC + imm_u;\n",
 
-      "00_05" ~: (Case "op" 2 [Sel 0b11 "[32bit instruction]" []]) ~=?
+
+      "00_05" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]] ~=?
+                  ensure [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] [],
+
+      "00_06" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" [RTL "rd = PC + imm_u;"]]] ~=?
+                  ensure [Code 4 "rd = PC + imm_u;" ,CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] [],
+
+      "00_07" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]] ~=?
+                  ensure [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] [Case "op" 2 []],
+
+      "00_08" ~: [Case "op" 2 [Sel 0b00 "[16bit instruction]" [], Sel 0b11 "[32bit instruction]" []]] ~=?
+                  ensure [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] [Case "op" 2 [Sel 0b00 "[16bit instruction]" []]],
+
+      "00_09" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]] ~=?
+                  ensure [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]],
+
+      "00_10" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" [
+                    Case "opcode" 5 [Sel 0b00101 "[AUIPC]" []]
+                  ]]] ~=?
+                  ensure [CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]", CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]],
+
+      "00_11" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" [
+                    Case "opcode" 5 [Sel 0b00101 "[AUIPC]" [RTL "id_we <= 1'b0;"]]
+                  ]]] ~=?
+                  ensure [Code 8 "id_we <= 1'b0;", CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]", CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]],
+
+      "00_12" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" [
+                    Case "opcode" 5 [Sel 0b00101 "[AUIPC]" [
+                      RTL "id_we <= 1'b0;",
+                      RTL "id_we <= 1'b1;"
+                    ]]
+                  ]]] ~=? 
+          let st1 = ensure [Code 8 "id_we <= 1'b0;", CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]", CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] [Case "op" 2 []]
+              st2 = ensure [Code 8 "id_we <= 1'b1;", CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]", CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] st1 in st2,
+
+      "00_13" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" [
+                    Case "opcode" 5 [Sel 0b00101 "[AUIPC]" [
+                        RTL "id_we <= 1'b0;",
+                        RTL "id_we <= 1'b1;"
+                      ], Sel 0b01101 "[LUI]" []                    
+                    ]
+                  ]]] ~=? 
+          let st1 = ensure [Code 8 "id_we <= 1'b0;", CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]", CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] []
+              st2 = ensure [Code 8 "id_we <= 1'b1;", CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]", CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] st1
+              st3 = ensure [CaseSel 4 "opcode" (5, 0b01101) "[LUI]", CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] st2 in st3,
+
+
+{-
+
+      "00_08" ~: Case "op" 2 [Sel 0b11 "[32bit instruction]" [
+                    Case "opcode" 5 [Sel 0b00101 "[AUIPC]" [],
+                                     Sel 0b01101 "[LUI]" []]
+                  ]] ~=?
+                  deepCopy (Case "op" 2 [Sel 0b11 "[32bit instruction]" [
+                    Case "opcode" 5 [Sel 0b00101 "[AUIPC]" [],
+                                     Sel 0b01101 "[LUI]" []]
+                  ]])
+
+-}
+
+{-
+      "00_10" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]]
+                   ~=?
+                  ensure [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] []
+-}
+
+{-
+      "00_05" ~: Case "op" 2 [Sel 0b11 "[32bit instruction]" []] ~=?
           convert [] (Case "root" 0 []) [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"],
 
-      "00_06" ~: (Case "op" 2 [Sel 0b11 "[32bit instruction]" [RTL "rd = imm_u;"]]) ~=?
+      "00_06" ~: Case "op" 2 [Sel 0b11 "[32bit instruction]" [RTL "rd = imm_u;"]] ~=?
           convert [] (Case "root" 0 []) [CaseSel 0 "op" (2, 0b11) "[32bit instruction]",
-                   Code 4 "rd = imm_u;"],
+                   Code 4 "rd = imm_u;"]
+-}
 
+      "01_00" ~: [CaseSel 4 "opcode" (5, 5) "[AUIPC]", CaseSel 0 "op" (2, 3) "[32bit instruction]"] ~=?
+                   let ss1 = switchState [] (CaseSel 0 "op" (2, 0b11) "[32bit instruction]")
+                       ss2 = switchState ss1 (CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]") 
+                       ss3 = switchState ss2 (CaseSel 4 "opcode" (5, 0b01101 ) "[LUI]") in ss2,
+
+      "01_01" ~: [CaseSel 4 "opcode" (5, 13) "[LUI]", CaseSel 0 "op" (2, 3) "[32bit instruction]"] ~=?
+                   let ss1 = switchState [] (CaseSel 0 "op" (2, 0b11) "[32bit instruction]")
+                       ss2 = switchState ss1 (CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]") 
+                       ss3 = switchState ss2 (CaseSel 4 "opcode" (5, 0b01101 ) "[LUI]") in ss3,
+
+      "01_02" ~: [Code 8 "id_we <= 1'b0;", CaseSel 4 "opcode" (5, 5) "[AUIPC]", CaseSel 0 "op" (2, 3) "[32bit instruction]"] ~=?
+                   let ss1 = switchState [] (CaseSel 0 "op" (2, 0b11) "[32bit instruction]")
+                       ss2 = switchState ss1 (CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]") 
+                       ss3 = switchState ss2 (Code 8 "id_we <= 1'b0;") in ss3
+
+
+
+{-
       "00_07" ~: [CaseSel 4 "opcode" (5,13) "[LUI]",CaseSel 0 "op" (2,3) "[32bit instruction]"] ~=?
                    let ss1 = switchState [] (CaseSel 0 "op" (2, 0b11) "[32bit instruction]")
                        ss2 = switchState ss1 (CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]") 
                        ss3 = switchState ss2 (CaseSel 4 "opcode" (5, 0b01101 ) "[LUI]") in ss3
-
+-}
     ]
 
 {-

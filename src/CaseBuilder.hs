@@ -2,8 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module CaseBuilder ( Def(..), Sel(..), buildCase, convert, switchState ) where
+module CaseBuilder ( Def(..), Sel(..), buildCase, convert, switchState, deepCopy, ensure ) where
 
+import Prelude hiding (lookup)
+import qualified Data.Map as M
 import qualified Data.ByteString.Lazy.Char8 as BS
 import           Data.ByteString.Builder
 import Parsing (Expr(..))
@@ -43,26 +45,76 @@ buildSel bits n x = case x of
         indent n $ intDec bits <> "'d" <> intDec val <> ": // " <> lazyByteString comment <> "\n" <>
         foldr1 (<>) (map (buildCase (n + 2)) defs)
 
+
+
 type State = [Expr]
 
 switchState :: State -> Expr -> State
 switchState [] e = [e]
 switchState (st:sts) e = case e of
-    Code sp code -> st:sts
-    CaseSel sp name (w, num) com -> case st of
-        Code _ _ -> st:sts
+    Code sp code -> case st of
         CaseSel st_sp _ _ _ -> if st_sp < sp then e:st:sts else switchState sts e
+        Code _ _ -> undefined
+    CaseSel sp name (w, num) com -> case st of
+        CaseSel st_sp _ _ _ -> if st_sp < sp then e:st:sts else switchState sts e
+        Code _ _ -> undefined
 
-{-
-getContext :: State -> Def -> Def
-getContext st ctx = getContext1 (reverse st) ctx
+popState :: State -> State
+popState [] = []
+popState (_:sts) = sts
 
-getContext1 :: State -> Def -> Def
-getContext1 [] ctx = ctx
-getContext1 (st:sts) ctx = case st of
-    CaseSel sp name (w, num) com -> case ctx of
-        Case 
--}
+deepCopy :: Def -> Def
+deepCopy def = case def of
+    Case name w sels -> Case name w $ map deepCopySel sels
+    RTL code -> RTL code
+
+deepCopySel :: Sel -> Sel
+deepCopySel sel = case sel of
+    Sel num com defs -> Sel num com $ map deepCopy defs
+
+ensure :: State -> [Def] -> [Def]
+ensure st = ensureDef (reverse st)
+
+ensureDef :: State -> [Def] -> [Def]
+ensureDef [] defs = defs
+ensureDef (st:sts) [] = case st of
+    CaseSel sp name (w, num) com -> [Case (BS.pack name) w (ensureSel (st:sts) [])]
+    Code sp code -> [RTL (BS.pack code)]
+ensureDef (st:sts) (def:defs) = ensureDefLoop (st:sts) (def:defs)
+
+
+ensureDefLoop :: State -> [Def] -> [Def]
+ensureDefLoop [] defs = defs
+ensureDefLoop (st:sts) [] = []
+ensureDefLoop (st:sts) (def:defs) = case st of
+    CaseSel sp name (w, num) com -> case def of
+        Case def_name def_w sels -> if def_name == (BS.pack name) then
+                Case (BS.pack name) w (ensureSel (st:sts) sels) : ensureDefLoop (st:sts) defs
+            else
+                def : ensureDefLoop (st:sts) defs
+        RTL code -> def : ensureDefLoop (st:sts) defs
+    Code sp code -> (def : defs) ++ [RTL (BS.pack code)]
+
+ensureSel :: State -> [Sel] -> [Sel]
+ensureSel [] [] = []
+ensureSel [] sels = sels
+ensureSel (st:sts) [] = case st of
+    CaseSel sp name (w, num) com -> [Sel num (BS.pack com) (ensureDef sts [])]
+    Code sp code -> undefined
+ensureSel (st:sts) (sel:sels) = ensureSelLoop (st:sts) (sel:sels)
+
+ensureSelLoop :: State -> [Sel] -> [Sel]
+ensureSelLoop [] sels = sels
+ensureSelLoop (CaseSel sp name (w, num) com:sts) [] = [Sel num (BS.pack com) []]
+ensureSelLoop (Code _ _:sts) [] = undefined
+ensureSelLoop (st:sts) (sel:sels) = case st of
+    CaseSel sp name (w, num) com -> case sel of
+        Sel sel_num sel_com defs -> if num == sel_num then
+            Sel sel_num sel_com (ensureDef sts defs) : sels
+        else
+            sel : ensureSelLoop (st:sts) sels
+    Code sp code -> undefined
+
 
 
 convert :: State -> Def -> [Expr] -> Def
