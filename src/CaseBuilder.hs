@@ -10,7 +10,7 @@ import Parsing (Expr(..), parse, parseExpr)
 import Control.Lens (makeLenses, (^.), (.~))
 
 data Sel = Sel {
-    _selNum :: Int,
+    _selNum :: BS.ByteString,
     _selCom :: BS.ByteString,
     _selDef :: [Def]
 } deriving (Show, Eq)
@@ -40,7 +40,7 @@ buildCase n x = case x of
 buildSel :: Int -> Int -> Sel -> Builder
 buildSel bits n x = case x of
     Sel val comment defs ->
-        indent n $ intDec bits <> "'d" <> intDec val <> ": // " <> lazyByteString comment <> "\n" <>
+        indent n $ intDec bits <> "'b" <> lazyByteString val <> ": // " <> lazyByteString comment <> "\n" <>
         foldr1 (<>) (map (buildCase (n + 2)) defs)
 
 
@@ -97,17 +97,17 @@ ensureSel :: State -> [Sel] -> [Sel]
 ensureSel [] [] = []
 ensureSel [] sels = sels
 ensureSel (st:sts) [] = case st of
-    CaseSel sp name (w, num) com -> [Sel num (BS.pack com) (ensureDef sts [])]
+    CaseSel sp name (w, num) com -> [Sel (BS.pack num) (BS.pack com) (ensureDef sts [])]
     Code sp code -> undefined
 ensureSel (st:sts) (sel:sels) = ensureSelLoop (st:sts) (sel:sels)
 
 ensureSelLoop :: State -> [Sel] -> [Sel]
 ensureSelLoop [] sels = sels
-ensureSelLoop (CaseSel sp name (w, num) com:sts) [] = [Sel num (BS.pack com) []]
+ensureSelLoop (CaseSel sp name (w, num) com:sts) [] = [Sel (BS.pack num) (BS.pack com) []]
 ensureSelLoop (Code _ _:sts) [] = undefined
 ensureSelLoop (st:sts) (sel:sels) = case st of
     CaseSel sp name (w, num) com -> case sel of
-        Sel sel_num sel_com defs -> if num == sel_num then
+        Sel sel_num sel_com defs -> if BS.pack num == sel_num then
             Sel sel_num sel_com (ensureDef sts defs) : sels
         else
             sel : ensureSelLoop (st:sts) sels

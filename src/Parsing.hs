@@ -56,9 +56,8 @@ digit :: Parser Int
 digit = do {d <- sat isDigit; return (cvt d)} where
     cvt d = fromEnum d - fromEnum '0'
 
-bit :: Parser Int
-bit = do {d <- sat (\c -> c == '0' || c == '1' || c == '_'); return (cvt d)} where
-    cvt d = if d == '_' then 2 else fromEnum d - fromEnum '0'
+bit :: Parser Char
+bit = sat (\c -> c == '0' || c == '1' || c == '_')
 
 (<|>) :: Parser a -> Parser a -> Parser a
 p <|> q = Parser f where
@@ -110,9 +109,8 @@ ident = do { a <- sat isAlpha; as <- many (sat isAlphaNum); return $ a:as}
 
 
 
-bits :: Parser Int
-bits = do {ds <- some bit; return (foldl1 shiftl ds)}
-        where shiftl m n = if n == 2 then m else 2 * m + n
+bits :: Parser [Char]
+bits = some bit
 
 tillCrlf :: Parser [Char]
 tillCrlf = many (sat (/= '\n'))
@@ -121,7 +119,7 @@ crlf :: Parser Char
 crlf = sat (== '\n')
 
 
-data Expr = CaseSel Int String (Int, Int) String |
+data Expr = CaseSel Int String (Int, String) String |
             Code Int String
             deriving (Show, Eq)
 
