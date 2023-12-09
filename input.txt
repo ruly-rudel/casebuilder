@@ -4,19 +4,19 @@ op 2'b11 [32bit instruction]
             next_pc = RS1 == RS2 ? PC + imm_b : PC + 'h4;
         funct3 3'b001 [BNE]
             next_pc = RS1 != RS2 ? PC + imm_b : PC + 'h4;
-    opcode 5'b00101 [AUIPC]
+    opcode 5'b00_101 [AUIPC]
         rd = PC + imm_u;
-    opcode 5'b01101 [LUI]
+    opcode 5'b01_101 [LUI]
         rd = imm_u;
-    opcode 5'b00110 [OP-IMM-32]
+    opcode 5'b00_110 [OP-IMM-32]
         funct3 3'b000 [ADDIW]
             rd = s32to64(RS1[31:0] + imm_i[31:0]);
-        funct3 3'b001 ...
-            funct7 7'b0000000 [SLLIW]
+        funct3 3'b001
+            funct7 7'b000_0000 [SLLIW]
                 rd = s32to64(RS1[31:0] << shamt[4:0]);
-        funct3 3'b101 ...
-            funct7 7'b0000000 [SRLIW]
+        funct3 3'b101
+            funct7 7'b000_0000 [SRLIW]
                 rd = s32to64(RS1[31:0] >> shamt[4:0]);
-            funct7 7'b0100000 [SRAIW]
+            funct7 7'b010_0000 [SRAIW]
                 rd = s32to64($signed(RS1[31:0]) >>> shamt[4:0]);
 

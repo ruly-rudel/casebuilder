@@ -57,8 +57,8 @@ digit = do {d <- sat isDigit; return (cvt d)} where
     cvt d = fromEnum d - fromEnum '0'
 
 bit :: Parser Int
-bit = do {d <- sat (\c -> c == '0' || c == '1'); return (cvt d)} where
-    cvt d = fromEnum d - fromEnum '0'
+bit = do {d <- sat (\c -> c == '0' || c == '1' || c == '_'); return (cvt d)} where
+    cvt d = if d == '_' then 2 else fromEnum d - fromEnum '0'
 
 (<|>) :: Parser a -> Parser a -> Parser a
 p <|> q = Parser f where
@@ -73,7 +73,7 @@ lowers :: Parser [Char]
 lowers = many lower
 
 space :: Parser ()
-space = many (sat isSpace) >> return ()
+space = many (sat (== ' ')) >> return ()
 
 symbol :: [Char] -> Parser ()
 symbol xs = space >> string xs
@@ -112,7 +112,7 @@ ident = do { a <- sat isAlpha; as <- many (sat isAlphaNum); return $ a:as}
 
 bits :: Parser Int
 bits = do {ds <- some bit; return (foldl1 shiftl ds)}
-        where shiftl m n = 2 * m + n
+        where shiftl m n = if n == 2 then m else 2 * m + n
 
 tillCrlf :: Parser [Char]
 tillCrlf = many (sat (/= '\n'))
@@ -137,6 +137,18 @@ parseCase = do
     _ <- crlf
     return $ CaseSel sp name (w, num) com
 
+parseCaseNoComment :: Parser Expr
+parseCaseNoComment = do
+    sp <- indent
+    name <- ident
+    w <- natural
+    string "'b"
+    num <- bits
+    space
+    _ <- crlf
+    return $ CaseSel sp name (w, num) ""
+
+
 parseCode :: Parser Expr
 parseCode = do
     sp <- indent
@@ -145,7 +157,7 @@ parseCode = do
     return $ Code sp code
 
 parseLine :: Parser Expr
-parseLine = parseCase <|> parseCode
+parseLine = parseCase <|> parseCaseNoComment <|> parseCode
 
 parseExpr :: Parser [Expr]
 parseExpr = many parseLine
