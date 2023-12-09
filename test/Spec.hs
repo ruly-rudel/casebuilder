@@ -3,7 +3,7 @@
 
 import Test.HUnit
 import Control.Monad ( void )
-import CaseBuilder (Def(..), Sel(..), buildCase, convert, switchState, deepCopy, ensure )
+import CaseBuilder (Def(..), Sel(..), buildCase, convert, switchState, ensure, buildCaseFromString )
 import Parsing (Expr(..), parse, parseExpr)
 import Data.ByteString.Builder (toLazyByteString)
 
@@ -146,33 +146,72 @@ main = do
               st3 = ensure [CaseSel 4 "opcode" (5, 0b01101) "[LUI]", CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] st2 in st3,
 
 
-{-
+      "00_14" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]] ~=?
+          convert [] [] [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"],
 
-      "00_08" ~: Case "op" 2 [Sel 0b11 "[32bit instruction]" [
-                    Case "opcode" 5 [Sel 0b00101 "[AUIPC]" [],
-                                     Sel 0b01101 "[LUI]" []]
-                  ]] ~=?
-                  deepCopy (Case "op" 2 [Sel 0b11 "[32bit instruction]" [
-                    Case "opcode" 5 [Sel 0b00101 "[AUIPC]" [],
-                                     Sel 0b01101 "[LUI]" []]
-                  ]])
+      "00_15" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" [Case "opcode" 5 [
+                    Sel 0b00101 "AUIPC" [RTL "rd <= imm_u;"],
+                    Sel 0b01101 "LUI"   [RTL "id_we <= 1'b0;"]
+                 ]]]] ~=?
+          convert [] [] [
+            CaseSel 0 "op" (2, 0b11) "[32bit instruction]",
+            CaseSel 4 "opcode" (5, 0b00101) "AUIPC",
+            Code 8 "rd <= imm_u;",
+            CaseSel 4 "opcode" (5, 0b01101) "LUI",
+            Code 8 "id_we <= 1'b0;"
+          ],
+      
+      "00_16" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" [Case "opcode" 5 [
+                    Sel 0b00101 "[AUIPC]" [RTL "rd <= imm_u;"],
+                    Sel 0b01101 "[LUI]"   [RTL "id_we <= 1'b0;"]
+                 ]]]] ~=?
+          convert [] [] (parse parseExpr (
+            "op 2'b11 [32bit instruction]\n" <>
+            "  opcode 5'b00101 [AUIPC]\n" <>
+            "    rd <= imm_u;\n" <>
+            "  opcode 5'b01101 [LUI]\n" <>
+            "    id_we <= 1'b0;\n"
+            )),
 
--}
+      "00_17" ~:
+        "case(op)\n" <>
+        "  2'd3: // [32bit instruction]\n" <>
+        "    case(opcode)\n" <>
+        "      5'd5: // [AUIPC]\n" <>
+        "        rd = PC + imm_u;\n" <>
+        "      5'd13: // [LUI]\n" <>
+        "        rd = imm_u;\n" <>
+        "      default: id_we = 1'b0;\n" <>
+        "    endcase\n" <>
+        "  default: id_we = 1'b0;\n" <>
+        "endcase\n" ~=?
+          let conv = convert [] [] (parse parseExpr (
+                "op 2'b11 [32bit instruction]\n" <>
+                "  opcode 5'b00101 [AUIPC]\n" <>
+                "    rd = PC + imm_u;\n" <>
+                "  opcode 5'b01101 [LUI]\n" <>
+                "    rd = imm_u;\n")) in 
+          toLazyByteString (buildCase 0 (head conv)),
 
-{-
-      "00_10" ~: [Case "op" 2 [Sel 0b11 "[32bit instruction]" []]]
-                   ~=?
-                  ensure [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"] []
--}
+      "00_18" ~:
+        "case(op)\n" <>
+        "  2'd3: // [32bit instruction]\n" <>
+        "    case(opcode)\n" <>
+        "      5'd5: // [AUIPC]\n" <>
+        "        rd = PC + imm_u;\n" <>
+        "      5'd13: // [LUI]\n" <>
+        "        rd = imm_u;\n" <>
+        "      default: id_we = 1'b0;\n" <>
+        "    endcase\n" <>
+        "  default: id_we = 1'b0;\n" <>
+        "endcase\n" ~=? buildCaseFromString (
+                "op 2'b11 [32bit instruction]\n" <>
+                "  opcode 5'b00101 [AUIPC]\n" <>
+                "    rd = PC + imm_u;\n" <>
+                "  opcode 5'b01101 [LUI]\n" <>
+                "    rd = imm_u;\n"),
 
-{-
-      "00_05" ~: Case "op" 2 [Sel 0b11 "[32bit instruction]" []] ~=?
-          convert [] (Case "root" 0 []) [CaseSel 0 "op" (2, 0b11) "[32bit instruction]"],
 
-      "00_06" ~: Case "op" 2 [Sel 0b11 "[32bit instruction]" [RTL "rd = imm_u;"]] ~=?
-          convert [] (Case "root" 0 []) [CaseSel 0 "op" (2, 0b11) "[32bit instruction]",
-                   Code 4 "rd = imm_u;"]
--}
 
       "01_00" ~: [CaseSel 4 "opcode" (5, 5) "[AUIPC]", CaseSel 0 "op" (2, 3) "[32bit instruction]"] ~=?
                    let ss1 = switchState [] (CaseSel 0 "op" (2, 0b11) "[32bit instruction]")
@@ -188,15 +227,6 @@ main = do
                    let ss1 = switchState [] (CaseSel 0 "op" (2, 0b11) "[32bit instruction]")
                        ss2 = switchState ss1 (CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]") 
                        ss3 = switchState ss2 (Code 8 "id_we <= 1'b0;") in ss3
-
-
-
-{-
-      "00_07" ~: [CaseSel 4 "opcode" (5,13) "[LUI]",CaseSel 0 "op" (2,3) "[32bit instruction]"] ~=?
-                   let ss1 = switchState [] (CaseSel 0 "op" (2, 0b11) "[32bit instruction]")
-                       ss2 = switchState ss1 (CaseSel 4 "opcode" (5, 0b00101) "[AUIPC]") 
-                       ss3 = switchState ss2 (CaseSel 4 "opcode" (5, 0b01101 ) "[LUI]") in ss3
--}
     ]
 
 {-

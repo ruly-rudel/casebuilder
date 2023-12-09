@@ -2,13 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module CaseBuilder ( Def(..), Sel(..), buildCase, convert, switchState, deepCopy, ensure ) where
+module CaseBuilder ( Def(..), Sel(..), buildCase, convert, switchState, deepCopy, ensure, buildCaseFromString ) where
 
-import Prelude hiding (lookup)
-import qualified Data.Map as M
 import qualified Data.ByteString.Lazy.Char8 as BS
 import           Data.ByteString.Builder
-import Parsing (Expr(..))
+import Parsing (Expr(..), parse, parseExpr)
 import Control.Lens (makeLenses, (^.), (.~))
 
 data Sel = Sel {
@@ -57,7 +55,7 @@ switchState (st:sts) e = case e of
         Code _ _ -> undefined
     CaseSel sp name (w, num) com -> case st of
         CaseSel st_sp _ _ _ -> if st_sp < sp then e:st:sts else switchState sts e
-        Code _ _ -> undefined
+        Code st_sp _ -> if st_sp < sp then e:st:sts else switchState sts e
 
 popState :: State -> State
 popState [] = []
@@ -117,9 +115,14 @@ ensureSelLoop (st:sts) (sel:sels) = case st of
 
 
 
-convert :: State -> Def -> [Expr] -> Def
-convert st ctx [] = undefined
-convert st ctx (e:es) = case e of
-    CaseSel sp name (w, num) com -> let new_st = switchState st e in
-        Case (BS.pack name) w [Sel num (BS.pack com) []]
-    Code sp code -> RTL (BS.pack code)
+convert :: State -> [Def] -> [Expr] -> [Def]
+convert _ defs [] = defs
+convert st defs (e:es) = let
+    new_st = switchState st e
+    new_defs = ensure new_st defs in
+        convert new_st new_defs es
+
+buildCaseFromString :: String -> BS.ByteString
+buildCaseFromString s =
+              let conv = convert [] [] (parse parseExpr s) in 
+                  toLazyByteString (foldr1 (<>) (map (buildCase 0) conv))
