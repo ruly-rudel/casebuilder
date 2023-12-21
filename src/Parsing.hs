@@ -19,11 +19,13 @@ parse :: Parser a -> String -> a
 parse p = fst. head . apply p
 
 instance Functor Parser where
-    fmap = undefined
+    fmap fn pa = Parser (\cs -> fmap (\(a, str) -> (fn a, str)) (apply pa cs))
 
 instance Applicative Parser where
     pure x = Parser (\cs -> [(x, cs)])
-    (<*>) = undefined
+    (<*>) fn pa = Parser (\cs -> [(fn' y, cs'') |
+        (fn', cs') <- apply fn cs,
+        (y, cs'') <- apply pa cs' ])
 
 instance Monad Parser where
     p >>= q = Parser (\cs -> [(y, cs'') |
